@@ -120,3 +120,177 @@ try/except代码块，写那些可能报错的代码，并给出对应的处理�
         print("invalid inputs")
     else:
         print(f"result is {result}")
+
+## 15.在闭包中使用外围作用域的变量
+### 0.闭包的概念和基本用途
+闭包是一个比较综合的概念，有一个定义是：函数内部的嵌套函数可以在函数结束后仍然使用函数局部变量中的函数。如下，嵌套函数counter在外部函数make_counter被执行完后，还是可以使用外部作用域中的count变量。
+
+    def make_counter():
+        count = 0  # 外部函数的局部变量，被闭包“记住”
+        
+        def counter():
+            nonlocal count  # 声明修改外部变量
+            count += 1
+            return count
+        
+        return counter
+
+    counter1 = make_counter()
+    print(counter1())  # 1
+    print(counter1())  # 2
+
+    counter2 = make_counter()  # 新的闭包，拥有独立的count
+    print(counter2())  # 1
+
+一般来讲，闭包的作用是将外部函数中的信息进行隐藏，实现了封装；保存外部函数中的信息，使其可以持续存在。  
+在封装的效果上，和类的封装是差不多的，在简单的场景下，会使用闭包来做。  
+还有一种用法就是装饰器，在不修改原代码的基础上，动态的为函数添加新的功能，但终究不是纯粹的闭包了。
+
+### 1.书中的例子
+书中并没有强调闭包本身，而是在强调使用闭包时，对作用域的控制，扩展一下，就是使用闭包时，怎么避免或者利用不同作用域之间的污染。   
+下面一段代码，实现对数据进行排序，检查是否有重点对象并返回标志，重点对象的优先级最高。
+
+    def sort_priority(numbers, group):
+        found = False
+        def helper(x):
+            if x in group:
+                found = True
+                return (0, x)
+            return (1, x)
+        numbers.sort(key=helper)
+        return found
+
+    numbers = [2,5,9,6,3,4,7,8,5,1]
+    found = sort_priority(numbers, {4,6,2,9})
+    print(f"found", found)
+    print(numbers)
+    # found False
+    # [2, 4, 6, 9, 1, 3, 5, 5, 7, 8] 
+
+可以看到，函数的返回值不是预料值，这是因为尾部函数和内部函数的作用域没有打通，要想打通，那就是用nonlocal关键字，如下： 
+
+    def sort_priority(numbers, group):
+        found = False
+        def helper(x):
+            nonlocal found
+            if x in group:
+                found = True
+                return (0, x)
+            return (1, x)
+        numbers.sort(key=helper)
+        return found
+
+    numbers = [2,5,9,6,3,4,7,8,5,1]
+    found = sort_priority(numbers, {4,6,2,9})
+    print(f"found", found)
+    print(numbers)
+    # found True
+    # [2, 4, 6, 9, 1, 3, 5, 5, 7, 8]
+
+nonlocal和global有些相似，都是将不同作用域进行关联，但是nonlocal只能打通一层作用域，而global时全局作用域，实际上，使用nonlocal不如直接声明类。
+
+    def sort_priority():
+        found = False
+        def helper():
+            nonlocal found
+            found = True
+
+        helper()
+        return found
+
+    found = False
+    found_local = sort_priority()
+    print(f"local found", found_local)
+    print(f"global found", found)
+    # local found True
+    # global found False
+
+将内部作用域与外部作用域打通了，对全局作用域不起作用。
+
+    def sort_priority():
+        found = False
+        def helper():
+            global found
+            found = True
+
+        helper()
+        return found
+
+    found = False
+    found_local = sort_priority()
+    print(f"local found", found_local)
+    print(f"global found", found)
+    # local found True
+    # global found False
+
+将内部作用域与全局作用域打通了，对外部作用域不起作用。
+
+    def sort_priority():
+        nonlocal found 
+        found = True
+        return found
+
+    found = False
+    found_local = sort_priority()
+    print(f"local found", found_local)
+    print(f"global found", found)
+
+    #     nonlocal found
+    #     ^^^^^^^^^^^^^^
+    # SyntaxError: no binding for nonlocal 'found' found
+
+仅有函数作用域和全局作用域，因此nonlocal不能找到外部作用域而失效。
+
+
+## 16.使用生成器来改写直接返回列表的函数
+只能说根据需要来吧，这几种写法一般是没有啥问题的，生成器是惰性的，也就是他不会瞬间释放大量的内存，但是如果重复索引就不如列表灵活了。如果仅仅是单纯获取一次数据，类似生产者和消费者那样，在不考虑内存的情况下，列表是微微快于生成器的。
+
+读取一段字符串中的所有单词的首字母，并返回其索引位置。需要函数返回一系列结果，可以使用列表直接返回结果，也可以直接返回一个生成器（迭代器）。
+
+    def index_words(text):
+        result = []
+        if text:
+            result.append(0)
+        for index, letter in enumerate(text):
+            if letter == ' ':
+                result.append(index + 1)
+        return result
+
+    address = "long long years ago"
+    result = index_words(address)
+    print(result)
+
+这是一个很常见的使用列表返回结果的写法。
+
+    def index_words(text):
+        yield 0
+        for index, letter in enumerate(text):
+            if letter == ' ':
+                yield index + 1
+
+    address = "long long years ago"
+    result = list(index_words(address))
+    print(result)
+
+这是一个很常见的使用生成器返回结果的写法。
+
+    from itertools import islice
+
+    def index_file(f):
+        result = 0
+        for line in f:
+            if line:
+                yield result
+            for letter in line:
+                result += 1
+                if letter == ' ':
+                    yield result
+
+    with open("data.txt", 'r') as f:
+        swap = index_file(f)
+        result = islice(swap, 0, 4)
+        print(list(result))
+        print(list(swap))
+
+这是利用生成器来获取一个文件中，所有单词首字母索引的常见写法
+
