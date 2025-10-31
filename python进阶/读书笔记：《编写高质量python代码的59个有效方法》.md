@@ -3,7 +3,43 @@
 作者： Brett Slatkin  
 评论： 我买的版本是16年的，书中主要涉及py2和py3.4，可以说我买到的那一刻这本书的内容就严重过时了，幸好此书主要讲述pythonic，这正是我所欠缺的，因此我一边看，一边应用，一边批判，最终提升我对python代码码风的理解。  
 
-# pythonic （代码风格）
+# Pythonic （代码风格）
+
+## 1. python 版本
+py2、py3、py3.8 -- 大版本  
+每年一个年度版本、每个年度版本中有稳定版、发行版、测试版、  
+不同大版本之间关系，小版本关系、版本间关系、项目环境关系  
+项目运行所需环境：py解释器、支持库
+
+## 2. pep8风格
+了解就行，还真有人遵循
+
+## 3. bytes、str、unicode区别
+字符与字符串区别、子啊文本中的储存方式不同引起，默认utf-8即可
+
+## 4. 推荐使用辅助函数
+辅助函数主要意义在代码***简化与复用***
+
+## 5. 序列切割
+所有实现了魔法方法getitem和setitem的类均支持，常见的就是列表和字符串
+
+## 6. 序列切割时，不要写太复杂的格式
+想写啥写啥、什么年代了
+
+## 7. 用列表推导来取代map和filter
+推导式好用，类似与map，这里的filter只是混进来的莫名的内置函数
+
+## 8. 列表推导不要嵌套两层以上
+主要是便于查看，实际上非常推荐，但是不这么做一点问题没有
+
+## 9. 数据量大的列表推导用生成器来实现
+防止瞬时内存占用过大导致程序崩溃
+
+
+
+
+
+
 
 
 ## 10. 利用enumerate 代替 range
@@ -293,4 +329,171 @@ nonlocal和global有些相似，都是将不同作用域进行关联，但是non
         print(list(swap))
 
 这是利用生成器来获取一个文件中，所有单词首字母索引的常见写法
+
+## 17. 生成器只能迭代一次
+
+1. 一个生成器在全局只能迭代一次
+2. 可以用可产生生成器的匿名函数来代替
+3. 自定义可迭代的容器来代替
+
+意外发现：python允许一个文件被多次同时打开，只要不是读写独占即可，下面是示例：
+
+    class Reader:
+        def __init__(self, path):
+            self.path = path
+
+        def __iter__(self):
+            with open(self.path, mode='a+') as f:
+                f.seek(0)
+                for line in f:
+                    yield line
+
+    visits0 = Reader('data.txt')
+    visits1 = Reader('data.txt')
+    print(next(iter(visits0)))
+    print(next(iter(visits1)))
+ 
+## 18.用可变参数减少视觉杂讯
+这里是函数的可变参数传入即*args， **kwargs的用法。涉及解包打包的知识。
+存在问题如下：
+1. 传入参数需要将可变长变量转化为元组，因此需要迭代，所以参数数量不能太多
+2. 更新时会产生难以发现的bug，推荐使用关键字形式指定的参数来更新。
+
+        def log(message, *values):
+            if not values:
+                print(message)
+            else:
+                print(message, values)
+                print(message, *values)
+
+        log(1)
+        log(1, 345)
+        # 1
+        # 1 (345,)
+        # 1 345
+
+
+## 19. 关键字参数来优化传入参数
+注意：
+1. 位置参数必须在关键字参数前面
+2. 关键字参数仍可使用位置参数来指定
+
+有优点： 
+1. 易读
+2. 缺省
+3.可维护
+
+建议：
+1. 有关键字参数就使用关键字形式
+
+示例：
+
+    def flow_rate(weight_diff, time_diff, period = 1, units_per_kg=1):
+        return weight_diff * time_diff / units_per_kg * period
+
+
+## 20.函数参数的动态默认值，使用None和说明
+函数的默认值参数是在加载模块的时候确定下来的，确定之后不会因调用信息而发生变化。
+
+此外，还有一种情况，就是我的默认值参数是可变数据类型，然后函数调用或者返回值使用到了这个默认参数，那么所有的行为，都是对一个可变数据类型的参数进行修改的。
+
+如下，我们希望可以打印日志和日志时间，显然不同日志的时间戳时不一样的，但实际打印值一样。
+
+    import time
+
+    def log(message, when=time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())):
+        print(when, message)
+
+    log("message1")
+    time.sleep(1)
+    log("message2")
+
+    # 2025-10-31 16:09:39 message1
+    # 2025-10-31 16:09:39 message2
+
+我们推荐下面的写法，将动态默认值改为None，并在文档字符串中进行说明，如下：
+
+    import time
+
+    def log(message, when=None):
+        """打印消息和消息时间
+            
+        :param message: 消息内容
+        :param when: 消息传入时间
+        """
+        when = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime()) if when is None else when
+        print(when, message)
+
+    log("message1")
+    time.sleep(1)
+    log("message2")
+
+    # 2025-10-31 16:14:12 message1
+    # 2025-10-31 16:14:13 message2
+
+同样的，可变数据类型作为默认参数也是不推荐的。这会导致变量错误重复利用。
+
+## 21. 只能通过关键字形式指定的参数，确保代码含义清晰
+
+形如 def func(param1, param2, *, param3=3, param4=4)， 使得第三个和第四个参数只能通过关键字形式进行指定。和**kwargs是完全不一样的，但实际上，整个过程是可以通过 **kwargs来实现的，本质功能相同，可能是一种算法糖吧
+
+看下面的示例，我们想要一个安全的除法器，可以自定义忽略那些错误。但是我们在调用的时候，可能会忘记参数的实际意义，还有我们可能通过位置参数错误的传入不想要的指令，因此我们希望有只能通过关键字形式指定的参数。
+
+
+    def safe_division(number, divisor, ignore_overflow, ignore_zero_division):
+        """一种可以忽略参数异常的除法函数
+
+        :param number: 分子
+        :param divisor: 分母
+        :param ignore_overflow: 是否忽略计算溢出错误
+        :param ignore_zero_division: 是否忽略除零错误
+        :return: 结果
+        """
+        try:
+            return number / divisor
+        except OverflowError:
+            if ignore_overflow:
+                return 0
+            else:
+                raise
+        except ZeroDivisionError:
+            if ignore_zero_division:
+                return float('inf')
+            else:
+                raise
+
+    print(safe_division(1.0, 10 ** 500, True, False))
+    print(1.0/ 10 ** 500)
+
+    #     print(1.0/ 10 ** 500)
+    #           ~~~^~~~~~~~~~~
+    # OverflowError: int too large to convert to float
+    # 0
+
+    print(safe_division(1.0, 0, False, True))
+
+    # 0
+    # inf
+
+
+我们可以这样重新定义, 那么一般的使用者就可以将它作为普通除法器使用，而专业使用者就可以能加灵活的使用它了。
+
+    def safe_division(number, divisor, *，ignore_overflow=False, ignore_zero_division=False):
+
+# 类
+
+## 22. 用辅助类来维护程序状态，避免过长的字典、元组、复杂逻辑
+这是一个关于程序面临可扩展性与需求之间的博弈。唯有经理一个开发过程才能理解。
+
+1. 需求简单、不需扩展：直接最简单的数据结构就可以
+2. 需求简单、大量扩展：似乎没有这种情况，请使用具名数组等节省开销的方法
+3. 需求复杂、大量扩展：老老实实的将所有逻辑和数据结构进行拆分，尽量不要循环嵌套，字典嵌套等行为。
+4. 需求转变：宁可最复杂，不要简单。
+
+## 23. 类的接口，回调函数优于带call魔法命令的类的对象
+坦白说，没看懂
+
+回调函数：用于动态的扩展功能，或者检测程序运行情况
+
+字符串代码，通过eval运行表达式并获得结果，通过exec创建函数，不返回结果
 
